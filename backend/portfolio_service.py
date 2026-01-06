@@ -1,12 +1,10 @@
-import yfinance as yf
-import requests
-import time
+import os
 from typing import Dict, List, Optional
 from supabase import create_client, Client
 
-# Supabase credentials
-SUPABASE_URL = "https://xfaicvomzoisplarbjjs.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhmYWljdm9tem9pc3BsYXJiampzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NzcxOTUzNiwiZXhwIjoyMDgzMjk1NTM2fQ.LsXoGMW-VhZETtGyMcfVcID36mVaj19ugaBoRAnIbAY"
+# Supabase credentials (use environment variables)
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
 class PortfolioService:
     def __init__(self):

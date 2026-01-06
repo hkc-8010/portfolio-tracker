@@ -53,11 +53,19 @@ portfolio-tracker/
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
-3. Install dependencies:
+3. Setup environment variables:
+   ```bash
+   cp ../.env.example .env
+   # Edit .env and add your Supabase credentials
+   ```
+4. Install dependencies:
    ```bash
    pip install fastapi uvicorn yfinance supabase pandas openpyxl
    ```
-4. Set up your Supabase environment variables in `portfolio_service.py` (or use a `.env` file).
+### Credentials
+Ensure the following environment variables are set in your `.env` file for local development and in the Vercel dashboard for production:
+- `SUPABASE_URL`
+- `SUPABASE_KEY`
 
 ### Frontend Setup
 1. Navigate to the `frontend` directory:

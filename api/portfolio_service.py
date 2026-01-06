@@ -6,8 +6,8 @@ from typing import Dict, List, Optional
 from supabase import create_client, Client
 
 # Supabase credentials (use environment variables)
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://xfaicvomzoisplarbjjs.supabase.co")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
 class PortfolioService:
     def __init__(self):
