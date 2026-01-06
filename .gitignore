@@ -1,0 +1,18 @@
+# Virtual Environments
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+dist/
+.DS_Store
+
+# Logs
+*.log
+
+# Sensitive Data
+.env
+portfolio_settings.json
