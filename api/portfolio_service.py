@@ -11,10 +11,20 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 
 class PortfolioService:
     def __init__(self):
-        self.supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        if not SUPABASE_URL or not SUPABASE_KEY:
+            self.supabase = None
+            print("ERROR: SUPABASE_URL or SUPABASE_KEY is missing from environment variables")
+        else:
+            try:
+                self.supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+            except Exception as e:
+                self.supabase = None
+                print(f"ERROR: Failed to initialize Supabase client: {e}")
 
     def get_holdings(self) -> List[Dict]:
         """Reads holdings from Supabase and merges with live data."""
+        if self.supabase is None:
+            raise Exception("Supabase client not initialized. Check environment variables.")
         try:
             # Fetch all holdings from Supabase
             response = self.supabase.table('holdings').select('*').execute()
