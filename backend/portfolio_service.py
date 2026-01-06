@@ -1,6 +1,17 @@
+import yfinance as yf
+import requests
+import time
 import os
 from typing import Dict, List, Optional
 from supabase import create_client, Client
+try:
+    from dotenv import load_dotenv
+    # Load .env from root or current directory
+    load_dotenv()
+    # Also try loading from one level up if we are in /backend
+    load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+except ImportError:
+    pass
 
 # Supabase credentials (use environment variables)
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
