@@ -17,3 +17,4 @@ dist/
 # Sensitive Data
 .env
 portfolio_settings.json
+.vercel
