@@ -4,6 +4,11 @@ import time
 import os
 from typing import Dict, List, Optional
 from supabase import create_client, Client
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 # Supabase credentials (use environment variables)
 SUPABASE_URL = os.environ.get("SUPABASE_URL")

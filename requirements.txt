@@ -5,4 +5,5 @@ supabase
 pandas
 openpyxl
 requests
+python-dotenv
 python-multipart
