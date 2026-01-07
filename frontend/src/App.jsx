@@ -1,8 +1,19 @@
-import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
 import HoldingsTable from './components/HoldingsTable';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      gcTime: 1000 * 60 * 60 * 24, // 24 hours
+    },
+  },
+});
+
+const persister = createSyncStoragePersister({
+  storage: window.localStorage,
+});
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -42,7 +53,10 @@ class ErrorBoundary extends React.Component {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{ persister }}
+    >
       <ErrorBoundary>
         <div className="min-h-screen bg-gray-50/50">
           <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
@@ -64,7 +78,7 @@ function App() {
           </main>
         </div>
       </ErrorBoundary>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   );
 }
 

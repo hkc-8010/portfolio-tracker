@@ -20,6 +20,8 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 class PortfolioService:
     def __init__(self):
         self.supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        self._price_cache = {}  # Format: {ticker: {"price": float, "day_change": float, "ts": float}}
+        self._cache_expiry = 60  # seconds
 
     def get_holdings(self) -> List[Dict]:
         """Reads holdings from Supabase and merges with live data."""
@@ -32,31 +34,39 @@ class PortfolioService:
                 return []
             
             # Collect all tickers for bulk fetching (deduplicate and strip)
-            tickers_to_fetch = list(set(h['ticker'].strip() for h in holdings if h.get('ticker')))
+            # Collect all tickers for bulk fetching (deduplicate, strip, and check cache)
+            now = time.time()
+            tickers_to_fetch = []
+            cached_holdings_count = 0
             
-            # If no tickers, return holdings immediately (skip yfinance)
-            if not tickers_to_fetch:
-                print("No tickers found - skipping live price fetch")
-                for holding in holdings:
-                    holding['state'] = 'HOLD'
-                    holding['state_reason'] = ''
-                return holdings
+            # First pass: check cache
+            for h in holdings:
+                ticker = h.get('ticker', '').strip()
+                if not ticker: continue
+                
+                cache_entry = self._price_cache.get(ticker)
+                if cache_entry and (now - cache_entry['ts'] < self._cache_expiry):
+                    cached_holdings_count += 1
+                else:
+                    if ticker not in tickers_to_fetch:
+                        tickers_to_fetch.append(ticker)
+
+            # If no tickers need fetching, we'll still go through the processing loop
+            # which will use the cache.
             
             try:
-                # Let yfinance handle the session (uses curl_cffi internally)
-                print(f"Fetching prices for {len(tickers_to_fetch)} unique tickers...")
-                
-                # group_by='ticker' ensures a MultiIndex (Ticker, Field)
-                data = yf.download(
-                    ' '.join(tickers_to_fetch),
-                    period='5d',
-                    group_by='ticker',
-                    progress=False,
-                    threads=False
-                )
-                
-                if data.empty:
-                    print("ERROR: No data returned from yfinance for any ticker")
+                if tickers_to_fetch:
+                    print(f"Fetching prices for {len(tickers_to_fetch)} unique tickers from yfinance (Cached: {cached_holdings_count})...")
+                    data = yf.download(
+                        ' '.join(tickers_to_fetch),
+                        period='5d',
+                        group_by='ticker',
+                        progress=False,
+                        threads=False
+                    )
+                else:
+                    print(f"All {cached_holdings_count} tickers found in cache. Skipping yfinance fetch.")
+                    data = None
 
                 # Process each holding
                 for holding in holdings:
@@ -67,34 +77,45 @@ class PortfolioService:
                     holding['state_reason'] = ''
                     holding['current_price'] = None
                     holding['day_change_percent'] = None
+                    holding['day_change_amount'] = None
                     holding['total_return_percent'] = None
                     
                     if not ticker:
                         continue
                         
                     try:
-                        # Extract ticker data safely from MultiIndex dataframe
-                        # Try MultiIndex access first
+                        # 1. Check if we just fetched fresh data for this ticker
                         hist = None
-                        if ticker in data.columns.get_level_values(0):
-                            hist = data[ticker].dropna(subset=['Close'])
+                        if data is not None and not data.empty:
+                            if ticker in data.columns.get_level_values(0):
+                                hist = data[ticker].dropna(subset=['Close'])
                         
-                        # Fallback: if bulk fetch missed this ticker, try individual download
-                        if hist is None or hist.empty:
-                            hist = yf.download(ticker, period='5d', progress=False, threads=False).dropna(subset=['Close'])
-
+                        # 2. If we have fresh hist, update cache
                         if hist is not None and not hist.empty:
                             current_price = float(hist['Close'].iloc[-1])
-                            holding['current_price'] = current_price
-                            # print(f"DEBUG: Processed {ticker}: {current_price}")
+                            day_change_amount = 0
+                            day_change_pct = 0
                             
-                            # Day change
                             if len(hist) > 1:
                                 prev_close = hist['Close'].iloc[-2]
                                 if prev_close > 0:
-                                    change_pct = ((current_price - prev_close) / prev_close) * 100
-                                    holding['day_change_percent'] = change_pct
-                                    holding['day_change_amount'] = current_price - prev_close
+                                    day_change_amount = current_price - prev_close
+                                    day_change_pct = (day_change_amount / prev_close) * 100
+                            
+                            self._price_cache[ticker] = {
+                                "price": current_price,
+                                "day_change_amount": day_change_amount,
+                                "day_change_percent": day_change_pct,
+                                "ts": time.time()
+                            }
+                        
+                        # 3. Apply price data (from cache - which might be exactly what we just updated)
+                        cache_entry = self._price_cache.get(ticker)
+                        if cache_entry:
+                            current_price = cache_entry['price']
+                            holding['current_price'] = current_price
+                            holding['day_change_amount'] = cache_entry['day_change_amount']
+                            holding['day_change_percent'] = cache_entry['day_change_percent']
                             
                             # Total return
                             if holding.get('average_buy_price'):
