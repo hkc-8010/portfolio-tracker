@@ -198,8 +198,10 @@ class PortfolioService:
             'market_cap': None,
             'sales_growth_3y': None,
             'sales_growth_5y': None,
+            'sales_growth_7y': None,
             'eps_growth_3y': None,
             'eps_growth_5y': None,
+            'eps_growth_7y': None,
         }
         
         try:
@@ -211,18 +213,22 @@ class PortfolioService:
             data['pe_ratio'] = info.get('trailingPE') or info.get('forwardPE')
             data['market_cap'] = info.get('marketCap')
             
-            # Growth calculations (3Y and 5Y - usually only 4Y available in yf)
+            # Growth calculations
             financials = t.financials
             if not financials.empty:
                 # Revenue Growth
                 if 'Total Revenue' in financials.index:
                     revs = financials.loc['Total Revenue'].tolist()
                     data['sales_growth_3y'] = self._calculate_cagr(revs, 3)
+                    data['sales_growth_5y'] = self._calculate_cagr(revs, 5)
+                    data['sales_growth_7y'] = self._calculate_cagr(revs, 7)
                 
-                # EPS Growth (Net Income / Approx shares or Net Income Common Stockholders)
+                # EPS Growth
                 if 'Net Income Common Stockholders' in financials.index:
                     ni = financials.loc['Net Income Common Stockholders'].tolist()
                     data['eps_growth_3y'] = self._calculate_cagr(ni, 3)
+                    data['eps_growth_5y'] = self._calculate_cagr(ni, 5)
+                    data['eps_growth_7y'] = self._calculate_cagr(ni, 7)
             
             # Cache the result
             self._fundamental_cache[ticker] = {"data": data, "ts": now}

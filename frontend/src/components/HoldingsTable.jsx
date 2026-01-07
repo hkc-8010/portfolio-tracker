@@ -251,59 +251,75 @@ const HoldingsTable = () => {
                                         holding.total_return_percent > 30 ? "bg-green-50/80 hover:bg-green-100/80" : ""
                                     )}
                                 >
-                                    <td className="p-4 font-medium text-gray-900">
+                                    <td className="p-4 font-medium text-gray-900 sticky left-0 bg-white z-10 border-r shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
                                         <div className="flex flex-col">
                                             <span>{holding.stock_name}</span>
-                                            <span className="text-xs text-gray-500 font-normal">{holding.isin}</span>
+                                            <span className="text-[10px] text-gray-400 font-normal uppercase">{holding.isin}</span>
                                             {holding.ticker && (
                                                 <a
                                                     href={`https://finance.yahoo.com/quote/${holding.ticker}`}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="text-xs text-indigo-600 hover:underline flex items-center mt-1 w-fit"
+                                                    className="text-[10px] text-indigo-600 hover:underline flex items-center mt-1 w-fit"
                                                 >
-                                                    {holding.ticker} <ExternalLink className="w-3 h-3 ml-1" />
+                                                    {holding.ticker} <ExternalLink className="w-2.5 h-2.5 ml-1" />
                                                 </a>
                                             )}
                                         </div>
                                     </td>
                                     <td className="p-4 text-right text-gray-600">{holding.quantity}</td>
                                     <td className="p-4 text-right text-gray-600">₹{holding.average_buy_price?.toLocaleString('en-IN')}</td>
-                                    <td className="p-4 text-right font-medium text-gray-900">
+                                    <td className="p-4 text-right font-medium text-gray-900 whitespace-nowrap">
                                         {holding.current_price ? `₹${holding.current_price.toLocaleString('en-IN')}` : '-'}
                                     </td>
                                     <td className={clsx("p-4 text-right font-medium",
                                         holding.day_change_percent > 0 ? "text-green-600" : holding.day_change_percent < 0 ? "text-red-600" : "text-gray-600"
                                     )}>
-                                        {holding.day_change_percent ? `${holding.day_change_percent > 0 ? '+' : ''}${holding.day_change_percent.toFixed(2)}%` : '-'}
+                                        {holding.day_change_percent ? `${holding.day_change_percent > 0 ? '+' : ''}${holding.day_change_percent.toFixed(1)}%` : '-'}
                                     </td>
                                     <td className={clsx("p-4 text-right font-medium",
                                         holding.total_return_percent > 0 ? "text-green-600" : holding.total_return_percent < 0 ? "text-red-600" : "text-gray-600"
                                     )}>
-                                        {holding.total_return_percent ? `${holding.total_return_percent > 0 ? '+' : ''}${holding.total_return_percent.toFixed(2)}%` : '-'}
+                                        {holding.total_return_percent ? `${holding.total_return_percent > 0 ? '+' : ''}${holding.total_return_percent.toFixed(1)}%` : '-'}
                                     </td>
-                                    <td className="p-4 text-right font-medium text-gray-900">
+                                    <td className="p-4 text-right font-medium text-gray-900 whitespace-nowrap">
                                         {holding.current_price ? `₹${(holding.current_price * holding.quantity).toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : '-'}
                                     </td>
 
                                     {/* Fundamental Data Cells */}
-                                    <td className="p-4 text-right text-gray-600 bg-indigo-50/10">
+                                    <td className="p-4 text-right text-gray-600 bg-indigo-50/5">
                                         {holding.pe_ratio ? holding.pe_ratio.toFixed(1) : '-'}
                                     </td>
-                                    <td className="p-4 text-right text-gray-600 bg-indigo-50/10">
+                                    <td className="p-4 text-right text-gray-600 bg-indigo-50/5">
                                         {holding.peg_ratio ? holding.peg_ratio.toFixed(2) : '-'}
                                     </td>
-                                    <td className="p-4 text-right text-gray-600 bg-indigo-50/10">
+                                    <td className="p-4 text-right text-gray-600 bg-indigo-50/5">
                                         {holding.debt_to_equity ? holding.debt_to_equity.toFixed(2) : '-'}
                                     </td>
-                                    <td className="p-4 text-right text-gray-600 bg-indigo-50/10 whitespace-nowrap">
-                                        {holding.market_cap ? `₹${(holding.market_cap / 1e7).toFixed(0)} Cr` : '-'}
+                                    <td className="p-4 text-right text-gray-600 bg-indigo-50/5 whitespace-nowrap">
+                                        {holding.market_cap ? `${(holding.market_cap / 1e7).toFixed(0)} Cr` : '-'}
                                     </td>
-                                    <td className={clsx("p-4 text-right font-medium bg-green-50/10", (holding.sales_growth_3y || 0) > 15 ? "text-green-600" : "text-gray-600")}>
+
+                                    {/* Sales Growth */}
+                                    <td className={clsx("p-2 text-right text-[11px] border-l", (holding.sales_growth_3y || 0) > 15 ? "text-green-600 font-semibold" : "text-gray-600")}>
                                         {holding.sales_growth_3y ? `${holding.sales_growth_3y.toFixed(1)}%` : '-'}
                                     </td>
-                                    <td className={clsx("p-4 text-right font-medium bg-green-50/10", (holding.eps_growth_3y || 0) > 15 ? "text-green-600" : "text-gray-600")}>
+                                    <td className={clsx("p-2 text-right text-[11px] border-l", (holding.sales_growth_5y || 0) > 15 ? "text-green-600 font-semibold" : "text-gray-600")}>
+                                        {holding.sales_growth_5y ? `${holding.sales_growth_5y.toFixed(1)}%` : '-'}
+                                    </td>
+                                    <td className={clsx("p-2 text-right text-[11px] border-l", (holding.sales_growth_7y || 0) > 15 ? "text-green-600 font-semibold" : "text-gray-600")}>
+                                        {holding.sales_growth_7y ? `${holding.sales_growth_7y.toFixed(1)}%` : '-'}
+                                    </td>
+
+                                    {/* EPS Growth */}
+                                    <td className={clsx("p-2 text-right text-[11px] border-l", (holding.eps_growth_3y || 0) > 15 ? "text-green-600 font-semibold" : "text-gray-600")}>
                                         {holding.eps_growth_3y ? `${holding.eps_growth_3y.toFixed(1)}%` : '-'}
+                                    </td>
+                                    <td className={clsx("p-2 text-right text-[11px] border-l", (holding.eps_growth_5y || 0) > 15 ? "text-green-600 font-semibold" : "text-gray-600")}>
+                                        {holding.eps_growth_5y ? `${holding.eps_growth_5y.toFixed(1)}%` : '-'}
+                                    </td>
+                                    <td className={clsx("p-2 text-right text-[11px] border-l", (holding.eps_growth_7y || 0) > 15 ? "text-green-600 font-semibold" : "text-gray-600")}>
+                                        {holding.eps_growth_7y ? `${holding.eps_growth_7y.toFixed(1)}%` : '-'}
                                     </td>
 
                                     <td className="p-4 text-right">
@@ -313,10 +329,10 @@ const HoldingsTable = () => {
                                                 value={editForm.stopLoss}
                                                 onChange={e => setEditForm({ ...editForm, stopLoss: e.target.value })}
                                                 placeholder="SL"
-                                                className="w-20 text-xs p-1 border rounded"
+                                                className="w-16 text-xs p-1 border rounded"
                                             />
                                         ) : (
-                                            <span className="text-gray-600">{holding.stop_loss ? `₹${holding.stop_loss}` : '-'}</span>
+                                            <span className="text-gray-600 whitespace-nowrap">{holding.stop_loss ? `₹${holding.stop_loss}` : '-'}</span>
                                         )}
                                     </td>
                                     <td className="p-4 text-right">
@@ -326,10 +342,10 @@ const HoldingsTable = () => {
                                                 value={editForm.target}
                                                 onChange={e => setEditForm({ ...editForm, target: e.target.value })}
                                                 placeholder="Target"
-                                                className="w-20 text-xs p-1 border rounded"
+                                                className="w-16 text-xs p-1 border rounded"
                                             />
                                         ) : (
-                                            <span className="text-gray-600">{holding.target ? `₹${holding.target}` : '-'}</span>
+                                            <span className="text-gray-600 whitespace-nowrap">{holding.target ? `₹${holding.target}` : '-'}</span>
                                         )}
                                     </td>
                                     <td className="p-4 text-center">
