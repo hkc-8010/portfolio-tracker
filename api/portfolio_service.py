@@ -2,6 +2,8 @@ import yfinance as yf
 import requests
 import time
 import os
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from typing import Dict, List, Optional
 from supabase import create_client, Client
 try:
@@ -30,153 +32,155 @@ class PortfolioService:
                 self.supabase = None
                 print(f"ERROR: Failed to initialize Supabase client: {e}")
 
-    def get_holdings(self) -> List[Dict]:
-        """Reads holdings from Supabase and merges with live data."""
-        if self.supabase is None:
-            raise Exception("Supabase client not initialized. Check environment variables.")
+    def is_market_open(self) -> bool:
+        """Checks if Indian market is open (9:15 AM - 3:30 PM IST, Mon-Fri)."""
+        now = datetime.now(ZoneInfo("Asia/Kolkata"))
+        if now.weekday() >= 5:  # Saturday or Sunday
+            return False
+        
+        market_start = now.replace(hour=9, minute=15, second=0, microsecond=0)
+        market_end = now.replace(hour=15, minute=30, second=0, microsecond=0)
+        
+        return market_start <= now <= market_end
+
+    def get_holdings(self, portfolio_id: str) -> Dict:
+        """Reads holdings for a specific portfolio from Supabase and merges with live data."""
+        is_open = self.is_market_open()
         try:
-            # Fetch all holdings from Supabase
-            response = self.supabase.table('holdings').select('*').execute()
+            if not self.supabase:
+                return {"holdings": [], "is_market_open": is_open}
+            
+            # Fetch holdings for the portfolio
+            response = self.supabase.table('holdings').select('*').eq('portfolio_id', portfolio_id).execute()
             holdings = response.data
             
             if not holdings:
-                return []
+                return {"holdings": [], "is_market_open": is_open}
             
-            # Collect all tickers for bulk fetching (deduplicate, strip, and check cache)
-            now = time.time()
+            # Determine which tickers need fetching from yfinance
+            now_ts = time.time()
             tickers_to_fetch = []
-            cached_holdings_count = 0
             
-            # First pass: check cache
             for h in holdings:
                 ticker = h.get('ticker', '').strip()
                 if not ticker: continue
                 
-                cache_entry = self._price_cache.get(ticker)
-                if cache_entry and (now - cache_entry['ts'] < self._cache_expiry):
-                    cached_holdings_count += 1
+                # If market is open, use short cache
+                if is_open:
+                    cache_entry = self._price_cache.get(ticker)
+                    if not cache_entry or (now_ts - cache_entry['ts'] >= self._cache_expiry):
+                        if ticker not in tickers_to_fetch:
+                            tickers_to_fetch.append(ticker)
                 else:
-                    if ticker not in tickers_to_fetch:
-                        tickers_to_fetch.append(ticker)
+                    # If market is closed, only fetch if we have absolutely no cached price
+                    if not h.get('last_price'):
+                        if ticker not in tickers_to_fetch:
+                            tickers_to_fetch.append(ticker)
 
-            # If no tickers need fetching, we'll still go through the processing loop
-            # which will use the cache.
-            
+            # Bulk fetch from yfinance if needed
             try:
+                data = None
                 if tickers_to_fetch:
-                    print(f"Fetching prices for {len(tickers_to_fetch)} unique tickers from yfinance (Cached: {cached_holdings_count})...")
-                    data = yf.download(
-                        ' '.join(tickers_to_fetch),
-                        period='5d',
-                        group_by='ticker',
-                        progress=False,
-                        threads=False
-                    )
-                else:
-                    print(f"All {cached_holdings_count} tickers found in cache. Skipping yfinance fetch.")
-                    data = None
-                
-                if data is not None and data.empty:
-                    print("ERROR: No data returned from yfinance for any ticker")
+                    print(f"Fetching {len(tickers_to_fetch)} tickers (Market Open: {is_open})")
+                    data = yf.download(' '.join(tickers_to_fetch), period='5d', group_by='ticker', progress=False, threads=False)
 
-                # Process each holding
+                # Process results
+                updates_to_supabase = []
                 for holding in holdings:
                     ticker = holding.get('ticker', '').strip()
+                    holding['is_market_open'] = is_open
                     
-                    # Ensure defaults
-                    holding['state'] = 'HOLD'
-                    holding['state_reason'] = ''
-                    holding['current_price'] = None
-                    holding['day_change_percent'] = None
-                    holding['day_change_amount'] = None
-                    holding['total_return_percent'] = None
+                    # Ensure defaults for required frontend fields
+                    holding.setdefault('state', 'HOLD')
+                    holding.setdefault('state_reason', '')
                     
-                    if not ticker:
-                        continue
-                        
-                    try:
-                        # 1. Check if we just fetched fresh data for this ticker
-                        hist = None
-                        if data is not None and not data.empty:
-                            if ticker in data.columns.get_level_values(0):
-                                hist = data[ticker].dropna(subset=['Close'])
-                        
-                        # 2. If we have fresh hist, update cache
-                        if hist is not None and not hist.empty:
-                            current_price = float(hist['Close'].iloc[-1])
-                            day_change_amount = 0
-                            day_change_pct = 0
-                            
-                            if len(hist) > 1:
-                                prev_close = hist['Close'].iloc[-2]
-                                if prev_close > 0:
-                                    day_change_amount = current_price - prev_close
-                                    day_change_pct = (day_change_amount / prev_close) * 100
-                            
-                            self._price_cache[ticker] = {
-                                "price": current_price,
-                                "day_change_amount": day_change_amount,
-                                "day_change_percent": day_change_pct,
-                                "ts": time.time()
-                            }
-                        
-                        # 3. Apply price data (from cache - which might be exactly what we just updated)
-                        cache_entry = self._price_cache.get(ticker)
-                        if cache_entry:
-                            current_price = cache_entry['price']
-                            holding['current_price'] = current_price
-                            holding['day_change_amount'] = cache_entry['day_change_amount']
-                            holding['day_change_percent'] = cache_entry['day_change_percent']
-                            
-                            # Total return
-                            if holding.get('average_buy_price'):
-                                buy_price = float(holding['average_buy_price'])
-                                if buy_price > 0:
-                                    total_ret = ((current_price - buy_price) / buy_price) * 100
-                                    holding['total_return_percent'] = total_ret
-                            
-                            # Calculate State
-                            state = "HOLD"
-                            reason = ""
-                            target = holding.get('target')
-                            stop_loss = holding.get('stop_loss')
-                            
-                            if target and current_price >= float(target):
-                                state = "SELL"
-                                reason = "Target Hit"
-                            elif holding.get('total_return_percent', 0) >= 30:
-                                state = "SELL"
-                                reason = "Returns > 30%"
-                            elif stop_loss and current_price <= float(stop_loss):
-                                state = "SELL"
-                                reason = "Stop Loss Hit"
-                                
-                            holding['state'] = state
-                            holding['state_reason'] = reason
-                            
-                            # 4. Apply Fundamental Data (Cached or Fetch)
-                            fundamental = self._get_fundamental_data(ticker)
-                            holding.update(fundamental)
-                        else:
-                            print(f"ERROR: Could not fetch price data for {ticker}")
+                    if not ticker: continue
 
+                    # 1. Update cache with fresh yfinance data
+                    hist = None
+                    if data is not None and not data.empty and ticker in data.columns.get_level_values(0):
+                        hist = data[ticker].dropna(subset=['Close'])
+                    
+                    if hist is not None and not hist.empty:
+                        price = float(hist['Close'].iloc[-1])
+                        prev_close = hist['Close'].iloc[-2] if len(hist) > 1 else price
+                        change_amt = price - prev_close
+                        change_pct = (change_amt / prev_close * 100) if prev_close > 0 else 0
+                        
+                        # Update local cache
+                        self._price_cache[ticker] = {
+                            "price": price, "day_change_amount": change_amt, 
+                            "day_change_percent": change_pct, "ts": now_ts
+                        }
+                        
+                        # Prepare for Supabase persistence
+                        # Include required fields to avoid NOT NULL violations on INSERT
+                        db_payload = {
+                            "portfolio_id": portfolio_id,
+                            "isin": holding['isin'],
+                            "stock_name": holding.get('stock_name'),
+                            "quantity": holding.get('quantity'),
+                            "average_buy_price": holding.get('average_buy_price'),
+                            "ticker": holding.get('ticker'),
+                            "target": holding.get('target'),
+                            "stop_loss": holding.get('stop_loss'),
+                            "date_of_exit": holding.get('date_of_exit'),
+                            "last_price": price,
+                            "last_day_change_amt": change_amt,
+                            "last_day_change_pct": change_pct,
+                            "market_data_updated_at": datetime.now(ZoneInfo("UTC")).isoformat()
+                        }
+                        if 'id' in holding:
+                            db_payload['id'] = holding['id']
+                        updates_to_supabase.append(db_payload)
+
+                    # 2. Use data (Cache > Supabase Persistent > yf Fresh)
+                    cache_entry = self._price_cache.get(ticker)
+                    if cache_entry:
+                        holding['current_price'] = cache_entry['price']
+                        holding['day_change_amount'] = cache_entry['day_change_amount']
+                        holding['day_change_percent'] = cache_entry['day_change_percent']
+                    elif holding.get('last_price'):
+                        # Use persisted data from Supabase
+                        holding['current_price'] = float(holding['last_price'])
+                        holding['day_change_amount'] = float(holding.get('last_day_change_amt', 0))
+                        holding['day_change_percent'] = float(holding.get('last_day_change_pct', 0))
+                        holding['is_cached'] = True
+
+                    # 3. Calculate Returns and State
+                    if holding.get('current_price') and holding.get('average_buy_price'):
+                        curr = float(holding['current_price'])
+                        buy = float(holding['average_buy_price'])
+                        holding['total_return_percent'] = ((curr - buy) / buy * 100) if buy > 0 else 0
+                        
+                        # Logic for state
+                        if holding.get('target') and curr >= float(holding['target']):
+                            holding['state'], holding['state_reason'] = "SELL", "Target Hit"
+                        elif holding.get('total_return_percent', 0) >= 30:
+                            holding['state'], holding['state_reason'] = "SELL", "Returns > 30%"
+                        elif holding.get('stop_loss') and curr <= float(holding['stop_loss']):
+                            holding['state'], holding['state_reason'] = "SELL", "Stop Loss Hit"
+
+                    # 4. Fundamental Data
+                    holding.update(self._get_fundamental_data(ticker))
+
+                # Background update Supabase if we have new data
+                if updates_to_supabase:
+                    try:
+                        self.supabase.table('holdings').upsert(updates_to_supabase).execute()
                     except Exception as e:
-                        print(f"Error processing {ticker}: {e}")
-                            
+                        print(f"Supabase persistence error: {e}")
+
             except Exception as e:
-                print(f"Error bulk fetching data: {e}")
+                print(f"Fetch/Process error: {e}")
                 import traceback
                 traceback.print_exc()
-                # Ensure defaults for all if bulk fetch fails
-                for holding in holdings:
-                    holding['state'] = 'HOLD'
-                    holding['state_reason'] = ''
 
-            return holdings
+            return {"holdings": holdings, "is_market_open": is_open}
 
         except Exception as e:
-            print(f"Error reading holdings: {e}")
-            return []
+            print(f"get_holdings error: {e}")
+            return {"holdings": [], "is_market_open": is_open}
 
     def _calculate_cagr(self, values: List[float], years: int) -> Optional[float]:
         """Calculates CAGR for a list of annual values."""
@@ -246,7 +250,76 @@ class PortfolioService:
             
         return data
 
-    def update_holding_settings(self, isin: str, ticker: Optional[str] = None, date_of_exit: Optional[str] = None, target: Optional[float] = None, stop_loss: Optional[float] = None):
+    def delete_holdings(self, portfolio_id: str, isins: List[str]):
+        """Bulk deletes holdings from a portfolio."""
+        try:
+            if not isins:
+                return {"success": True}
+            
+            self.supabase.table('holdings').delete().eq('portfolio_id', portfolio_id).in_('isin', isins).execute()
+            return {"success": True}
+        except Exception as e:
+            print(f"Error deleting holdings: {e}")
+            return {"success": False, "error": str(e)}
+
+    def add_holding(self, data: Dict):
+        """Adds a new holding manually."""
+        try:
+            # Basic validation
+            if not data.get('portfolio_id') or not data.get('isin') or not data.get('stock_name'):
+                return {"success": False, "error": "Missing required fields"}
+            
+            # Upsert (uses portfolio_id + isin as primary key)
+            self.supabase.table('holdings').upsert(data).execute()
+            return {"success": True}
+        except Exception as e:
+            print(f"Error adding holding: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_portfolios(self) -> List[Dict]:
+        """Fetch all portfolios."""
+        try:
+            response = self.supabase.table('portfolios').select('*').execute()
+            return response.data
+        except Exception as e:
+            print(f"Error fetching portfolios: {e}")
+            return []
+
+    def create_portfolio(self, name: str) -> Dict:
+        """Create a new portfolio."""
+        try:
+            response = self.supabase.table('portfolios').insert({"name": name}).execute()
+            if response.data:
+                return {"success": True, "portfolio": response.data[0]}
+            return {"success": False, "error": "Failed to create portfolio"}
+        except Exception as e:
+            print(f"Error creating portfolio: {e}")
+            return {"success": False, "error": str(e)}
+
+    def rename_portfolio(self, portfolio_id: str, new_name: str) -> Dict:
+        """Rename an existing portfolio."""
+        try:
+            response = self.supabase.table('portfolios').update({"name": new_name}).eq('id', portfolio_id).execute()
+            if response.data:
+                return {"success": True, "portfolio": response.data[0]}
+            return {"success": False, "error": "Failed to rename portfolio"}
+        except Exception as e:
+            print(f"Error renaming portfolio: {e}")
+            return {"success": False, "error": str(e)}
+
+    def delete_portfolio(self, portfolio_id: str):
+        """Delete a portfolio and all its holdings."""
+        try:
+            # Cascade: Supabase normally handles this if FK is set to CASCADE,
+            # but we explicitly delete holdings just in case.
+            self.supabase.table('holdings').delete().eq('portfolio_id', portfolio_id).execute()
+            self.supabase.table('portfolios').delete().eq('id', portfolio_id).execute()
+            return {"success": True}
+        except Exception as e:
+            print(f"Error deleting portfolio: {e}")
+            return {"success": False, "error": str(e)}
+
+    def update_holding_settings(self, portfolio_id: str, isin: str, ticker: Optional[str] = None, date_of_exit: Optional[str] = None, target: Optional[float] = None, stop_loss: Optional[float] = None, quantity: Optional[int] = None, avg_price: Optional[float] = None):
         """Updates a holding's settings in Supabase."""
         try:
             update_data = {}
@@ -259,9 +332,13 @@ class PortfolioService:
                 update_data['target'] = target
             if stop_loss is not None:
                 update_data['stop_loss'] = stop_loss
+            if quantity is not None:
+                update_data['quantity'] = quantity
+            if avg_price is not None:
+                update_data['average_buy_price'] = avg_price
             
             if update_data:
-                self.supabase.table('holdings').update(update_data).eq('isin', isin).execute()
+                self.supabase.table('holdings').update(update_data).eq('portfolio_id', portfolio_id).eq('isin', isin).execute()
             
             return {"success": True}
         except Exception as e:

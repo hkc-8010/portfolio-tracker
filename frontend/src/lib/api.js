@@ -6,18 +6,50 @@ export const api = axios.create({
   baseURL: API_BASE_URL,
 });
 
-export const getHoldings = async () => {
-  const response = await api.get('/holdings');
+export const getPortfolios = async () => {
+  const response = await api.get('/portfolios');
   return response.data;
 };
 
-export const updateSettings = async (isin, ticker, dateOfExit, target, stopLoss) => {
+export const createPortfolio = async (name) => {
+  const response = await api.post('/portfolios', { name });
+  return response.data;
+};
+
+export const deletePortfolio = async (id) => {
+  const response = await api.delete(`/portfolios/${id}`);
+  return response.data;
+};
+
+export const renamePortfolio = async (id, name) => {
+  const response = await api.put(`/portfolios/${id}`, { name });
+  return response.data;
+};
+
+export const getHoldings = async (portfolioId) => {
+  if (!portfolioId) return [];
+  const response = await api.get(`/holdings?portfolio_id=${portfolioId}`);
+  return response.data;
+};
+
+export const addHolding = async (data) => {
+  const response = await api.post('/holdings/add', data);
+  return response.data;
+};
+
+export const deleteHoldingsBulk = async (portfolioId, isins) => {
+  const response = await api.post('/holdings/delete-bulk', {
+    portfolio_id: portfolioId,
+    isins
+  });
+  return response.data;
+};
+
+export const updateSettings = async (portfolioId, isin, settings) => {
   const response = await api.post('/settings', {
+    portfolio_id: portfolioId,
     isin,
-    ticker,
-    date_of_exit: dateOfExit,
-    target: target ? parseFloat(target) : null,
-    stop_loss: stopLoss ? parseFloat(stopLoss) : null,
+    ...settings
   });
   return response.data;
 };
