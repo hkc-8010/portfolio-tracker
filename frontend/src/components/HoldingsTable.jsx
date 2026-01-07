@@ -282,8 +282,15 @@ const HoldingsTable = () => {
                                     )}>
                                         {holding.total_return_percent ? `${holding.total_return_percent > 0 ? '+' : ''}${holding.total_return_percent.toFixed(2)}%` : '-'}
                                     </td>
-                                    <td className="p-4 text-right font-medium text-gray-900">
-                                        {holding.current_price ? `₹${(holding.current_price * holding.quantity).toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : '-'}
+                                    <td className="p-4 text-right font-medium text-gray-900 whitespace-nowrap">
+                                        {holding.current_price ? (
+                                            <>
+                                                <span>₹{((holding.current_price * holding.quantity)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                                                <span className="text-xs text-gray-400 font-normal ml-1">
+                                                    (₹{(holding.average_buy_price * holding.quantity).toLocaleString('en-IN', { maximumFractionDigits: 0 })})
+                                                </span>
+                                            </>
+                                        ) : '-'}
                                     </td>
 
                                     {/* Fundamental Data Cells */}
