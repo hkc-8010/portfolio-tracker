@@ -56,7 +56,7 @@ const HoldingsTable = () => {
 
     const [editingId, setEditingId] = useState(null);
     const [editForm, setEditForm] = useState({ ticker: '', dateOfExit: '', target: '', stopLoss: '' });
-    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+    const [sortConfig, setSortConfig] = useState({ key: 'total_return_percent', direction: 'desc' });
 
     // Sorting - MUST be before conditional returns
     const sortedHoldings = React.useMemo(() => {
