@@ -17,7 +17,7 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 class PortfolioService:
     def __init__(self):
         self._price_cache = {}  # Format: {ticker: {"price": float, "day_change": float, "ts": float}}
-        self._cache_expiry = 60  # seconds
+        self._cache_expiry = 5  # seconds
         if not SUPABASE_URL or not SUPABASE_KEY:
             self.supabase = None
             print("ERROR: SUPABASE_URL or SUPABASE_KEY is missing from environment variables")

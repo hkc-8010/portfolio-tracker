@@ -21,7 +21,7 @@ class PortfolioService:
     def __init__(self):
         self.supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
         self._price_cache = {}  # Format: {ticker: {"price": float, "day_change": float, "ts": float}}
-        self._cache_expiry = 60  # seconds
+        self._cache_expiry = 5  # seconds
 
     def get_holdings(self) -> List[Dict]:
         """Reads holdings from Supabase and merges with live data."""
