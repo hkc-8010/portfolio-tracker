@@ -130,7 +130,13 @@ const HoldingsTable = () => {
     // Calculations
     const totalValue = (holdings || []).reduce((sum, h) => sum + (h.current_price ? h.current_price * h.quantity : 0), 0);
     const totalInvestment = (holdings || []).reduce((sum, h) => sum + (h.average_buy_price ? h.average_buy_price * h.quantity : 0), 0);
-    const totalReturn = totalInvestment > 0 ? ((totalValue - totalInvestment) / totalInvestment) * 100 : 0;
+    const totalReturnAmount = totalValue - totalInvestment;
+    const totalReturnPercent = totalInvestment > 0 ? (totalReturnAmount / totalInvestment) * 100 : 0;
+
+    const totalDayChangeAmount = (holdings || []).reduce((sum, h) => sum + (h.day_change_amount ? h.day_change_amount * h.quantity : 0), 0);
+    const prevDayTotalValue = totalValue - totalDayChangeAmount;
+    const totalDayChangePercent = prevDayTotalValue > 0 ? (totalDayChangeAmount / prevDayTotalValue) * 100 : 0;
+
     const totalStocks = (holdings || []).length;
 
     return (
@@ -172,24 +178,37 @@ const HoldingsTable = () => {
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <p className="text-sm text-gray-500 mb-1">Total Stocks</p>
-                    <p className="text-3xl font-bold text-gray-900">{totalStocks}</p>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <p className="text-xs text-gray-500 mb-1">Total Stocks</p>
+                    <p className="text-2xl font-bold text-gray-900">{totalStocks}</p>
                 </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <p className="text-sm text-gray-500 mb-1">Total Portfolio Value</p>
-                    <p className="text-3xl font-bold text-gray-900">₹{totalValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <p className="text-xs text-gray-500 mb-1">Portfolio Value</p>
+                    <p className="text-2xl font-bold text-gray-900">₹{totalValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
                 </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <p className="text-sm text-gray-500 mb-1">Total Investment</p>
-                    <p className="text-3xl font-bold text-gray-900">₹{totalInvestment.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <p className="text-xs text-gray-500 mb-1">Investment</p>
+                    <p className="text-2xl font-bold text-gray-900">₹{totalInvestment.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
                 </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <p className="text-sm text-gray-500 mb-1">Total Return</p>
-                    <div className={clsx("flex items-center text-3xl font-bold", totalReturn >= 0 ? "text-green-600" : "text-red-600")}>
-                        {totalReturn >= 0 ? <ArrowUp className="w-6 h-6 mr-1" /> : <ArrowDown className="w-6 h-6 mr-1" />}
-                        {Math.abs(totalReturn).toFixed(2)}%
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <p className="text-xs text-gray-500 mb-1">Total Return</p>
+                    <div className={clsx("text-xl font-bold", totalReturnAmount >= 0 ? "text-green-600" : "text-red-600")}>
+                        <div className="flex items-center">
+                            {totalReturnAmount >= 0 ? <ArrowUp className="w-4 h-4 mr-1" /> : <ArrowDown className="w-4 h-4 mr-1" />}
+                            ₹{Math.abs(totalReturnAmount).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                        </div>
+                        <p className="text-xs font-medium opacity-80 mt-0.5">{totalReturnPercent.toFixed(2)}%</p>
+                    </div>
+                </div>
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <p className="text-xs text-gray-500 mb-1">1-Day Return</p>
+                    <div className={clsx("text-xl font-bold", totalDayChangeAmount >= 0 ? "text-green-600" : "text-red-600")}>
+                        <div className="flex items-center">
+                            {totalDayChangeAmount >= 0 ? <ArrowUp className="w-4 h-4 mr-1" /> : <ArrowDown className="w-4 h-4 mr-1" />}
+                            ₹{Math.abs(totalDayChangeAmount).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                        </div>
+                        <p className="text-xs font-medium opacity-80 mt-0.5">{totalDayChangePercent.toFixed(2)}%</p>
                     </div>
                 </div>
             </div>

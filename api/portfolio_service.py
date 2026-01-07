@@ -99,8 +99,9 @@ class PortfolioService:
                             if len(hist) > 1:
                                 prev_close = hist['Close'].iloc[-2]
                                 if prev_close > 0:
-                                    change = ((current_price - prev_close) / prev_close) * 100
-                                    holding['day_change_percent'] = change
+                                    change_pct = ((current_price - prev_close) / prev_close) * 100
+                                    holding['day_change_percent'] = change_pct
+                                    holding['day_change_amount'] = current_price - prev_close
                             
                             # Total return
                             if holding.get('average_buy_price'):
