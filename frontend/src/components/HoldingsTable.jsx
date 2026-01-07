@@ -5,10 +5,17 @@ import { ArrowUp, ArrowDown, RefreshCw, Wand2, Upload, ExternalLink, Edit2, Save
 import clsx from 'clsx';
 
 const HoldingsTable = () => {
+    const [lastUpdated, setLastUpdated] = useState(new Date());
     const queryClient = useQueryClient();
-    const { data: holdings, isLoading, error } = useQuery({
+    const { data: holdings, isLoading, error, isPlaceholderData } = useQuery({
         queryKey: ['holdings'],
-        queryFn: getHoldings,
+        queryFn: async () => {
+            const data = await getHoldings();
+            setLastUpdated(new Date());
+            return data;
+        },
+        refetchInterval: 2000,
+        refetchIntervalInBackground: true,
     });
 
     const updateMutation = useMutation({
@@ -129,7 +136,12 @@ const HoldingsTable = () => {
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h2 className="text-lg font-semibold text-gray-900">Portfolio Holdings</h2>
+                <div className="flex flex-col items-start">
+                    <h2 className="text-lg font-semibold text-gray-900">Portfolio Holdings</h2>
+                    <p className="text-[10px] text-gray-400 font-mono mt-0.5">
+                        Last Refresh: {lastUpdated.toLocaleTimeString()}
+                    </p>
+                </div>
                 <div className="flex items-center space-x-2">
                     <button
                         onClick={() => discoverMutation.mutate()}
