@@ -18,6 +18,8 @@ class PortfolioService:
     def __init__(self):
         self._price_cache = {}  # Format: {ticker: {"price": float, "day_change": float, "ts": float}}
         self._cache_expiry = 5  # seconds
+        self._fundamental_cache = {} # Format: {ticker: {"data": dict, "ts": float}}
+        self._fundamental_expiry = 24 * 3600  # 24 hours
         if not SUPABASE_URL or not SUPABASE_KEY:
             self.supabase = None
             print("ERROR: SUPABASE_URL or SUPABASE_KEY is missing from environment variables")
@@ -151,6 +153,10 @@ class PortfolioService:
                                 
                             holding['state'] = state
                             holding['state_reason'] = reason
+                            
+                            # 4. Apply Fundamental Data (Cached or Fetch)
+                            fundamental = self._get_fundamental_data(ticker)
+                            holding.update(fundamental)
                         else:
                             print(f"ERROR: Could not fetch price data for {ticker}")
 
@@ -171,6 +177,69 @@ class PortfolioService:
         except Exception as e:
             print(f"Error reading holdings: {e}")
             return []
+
+    def _calculate_cagr(self, values: List[float], years: int) -> Optional[float]:
+        """Calculates CAGR for a list of annual values."""
+        try:
+            if len(values) < years + 1:
+                return None
+            start_val = values[years]
+            end_val = values[0]
+            if start_val <= 0 or end_val <= 0:
+                return None
+            return ((end_val / start_val) ** (1/years) - 1) * 100
+        except Exception:
+            return None
+
+    def _get_fundamental_data(self, ticker: str) -> Dict:
+        """Fetch fundamental data with 24h caching."""
+        now = time.time()
+        cache_entry = self._fundamental_cache.get(ticker)
+        
+        if cache_entry and (now - cache_entry['ts'] < self._fundamental_expiry):
+            return cache_entry['data']
+        
+        print(f"Fetching fundamentals for {ticker}...")
+        data = {
+            'peg_ratio': None,
+            'debt_to_equity': None,
+            'pe_ratio': None,
+            'market_cap': None,
+            'sales_growth_3y': None,
+            'sales_growth_5y': None,
+            'eps_growth_3y': None,
+            'eps_growth_5y': None,
+        }
+        
+        try:
+            t = yf.Ticker(ticker)
+            info = t.info
+            
+            data['peg_ratio'] = info.get('pegRatio')
+            data['debt_to_equity'] = info.get('debtToEquity')
+            data['pe_ratio'] = info.get('trailingPE') or info.get('forwardPE')
+            data['market_cap'] = info.get('marketCap')
+            
+            # Growth calculations (Usually only 4Y available in yf)
+            financials = t.financials
+            if not financials.empty:
+                # Revenue Growth
+                if 'Total Revenue' in financials.index:
+                    revs = financials.loc['Total Revenue'].tolist()
+                    data['sales_growth_3y'] = self._calculate_cagr(revs, 3)
+                
+                # EPS Growth
+                if 'Net Income Common Stockholders' in financials.index:
+                    ni = financials.loc['Net Income Common Stockholders'].tolist()
+                    data['eps_growth_3y'] = self._calculate_cagr(ni, 3)
+            
+            # Cache the result
+            self._fundamental_cache[ticker] = {"data": data, "ts": now}
+            
+        except Exception as e:
+            print(f"Error fetching fundamentals for {ticker}: {e}")
+            
+        return data
 
     def update_holding_settings(self, isin: str, ticker: Optional[str] = None, date_of_exit: Optional[str] = None, target: Optional[float] = None, stop_loss: Optional[float] = None):
         """Updates a holding's settings in Supabase."""
