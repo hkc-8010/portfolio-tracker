@@ -226,6 +226,15 @@ const HoldingsTable = () => {
                                 <th className="p-4 font-medium text-right cursor-pointer hover:bg-gray-100" onClick={() => requestSort('day_change_percent')}>Day Change <SortIcon columnKey="day_change_percent" /></th>
                                 <th className="p-4 font-medium text-right cursor-pointer hover:bg-gray-100" onClick={() => requestSort('total_return_percent')}>Total Return <SortIcon columnKey="total_return_percent" /></th>
                                 <th className="p-4 font-medium text-right cursor-pointer hover:bg-gray-100" onClick={() => requestSort('current_value')}>Value <SortIcon columnKey="current_value" /></th>
+
+                                {/* Fundamental Data Columns */}
+                                <th className="p-4 font-medium text-right bg-indigo-50/30">P/E</th>
+                                <th className="p-4 font-medium text-right bg-indigo-50/30">PEG</th>
+                                <th className="p-4 font-medium text-right bg-indigo-50/30">D/E</th>
+                                <th className="p-4 font-medium text-right bg-indigo-50/30">Market Cap</th>
+                                <th className="p-4 font-medium text-right bg-green-50/30">Sales Growth (3Y)</th>
+                                <th className="p-4 font-medium text-right bg-green-50/30">EPS Growth (3Y)</th>
+
                                 <th className="p-4 font-medium text-right cursor-pointer hover:bg-gray-100" onClick={() => requestSort('stop_loss')}>SL <SortIcon columnKey="stop_loss" /></th>
                                 <th className="p-4 font-medium text-right cursor-pointer hover:bg-gray-100" onClick={() => requestSort('target')}>Target <SortIcon columnKey="target" /></th>
                                 <th className="p-4 font-medium text-center cursor-pointer hover:bg-gray-100" onClick={() => requestSort('state')}>State <SortIcon columnKey="state" /></th>
@@ -276,6 +285,27 @@ const HoldingsTable = () => {
                                     <td className="p-4 text-right font-medium text-gray-900">
                                         {holding.current_price ? `₹${(holding.current_price * holding.quantity).toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : '-'}
                                     </td>
+
+                                    {/* Fundamental Data Cells */}
+                                    <td className="p-4 text-right text-gray-600 bg-indigo-50/10">
+                                        {holding.pe_ratio ? holding.pe_ratio.toFixed(1) : '-'}
+                                    </td>
+                                    <td className="p-4 text-right text-gray-600 bg-indigo-50/10">
+                                        {holding.peg_ratio ? holding.peg_ratio.toFixed(2) : '-'}
+                                    </td>
+                                    <td className="p-4 text-right text-gray-600 bg-indigo-50/10">
+                                        {holding.debt_to_equity ? holding.debt_to_equity.toFixed(2) : '-'}
+                                    </td>
+                                    <td className="p-4 text-right text-gray-600 bg-indigo-50/10 whitespace-nowrap">
+                                        {holding.market_cap ? `₹${(holding.market_cap / 1e7).toFixed(0)} Cr` : '-'}
+                                    </td>
+                                    <td className={clsx("p-4 text-right font-medium bg-green-50/10", (holding.sales_growth_3y || 0) > 15 ? "text-green-600" : "text-gray-600")}>
+                                        {holding.sales_growth_3y ? `${holding.sales_growth_3y.toFixed(1)}%` : '-'}
+                                    </td>
+                                    <td className={clsx("p-4 text-right font-medium bg-green-50/10", (holding.eps_growth_3y || 0) > 15 ? "text-green-600" : "text-gray-600")}>
+                                        {holding.eps_growth_3y ? `${holding.eps_growth_3y.toFixed(1)}%` : '-'}
+                                    </td>
+
                                     <td className="p-4 text-right">
                                         {editingId === holding.isin ? (
                                             <input
