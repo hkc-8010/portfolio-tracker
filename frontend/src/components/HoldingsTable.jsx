@@ -54,7 +54,7 @@ const HoldingsTable = ({ portfolioId }) => {
     });
 
     const discoverMutation = useMutation({
-        mutationFn: autoDiscover,
+        mutationFn: () => autoDiscover(portfolioId),
         onSuccess: (data) => {
             alert(`Auto-discovery completed! Updated ${data.updated} tickers.`);
             queryClient.invalidateQueries(['holdings', portfolioId]);

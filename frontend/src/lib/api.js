@@ -54,8 +54,9 @@ export const updateSettings = async (portfolioId, isin, settings) => {
   return response.data;
 };
 
-export const autoDiscover = async () => {
-  const response = await api.post('/discover');
+export const autoDiscover = async (portfolioId) => {
+  const url = portfolioId ? `/discover?portfolio_id=${portfolioId}` : '/discover';
+  const response = await api.post(url);
   return response.data;
 };
 

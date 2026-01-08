@@ -84,8 +84,8 @@ def update_settings(request: UpdateSettingsRequest):
     )
 
 @app.post("/api/discover")
-def auto_discover():
-    result = portfolio_service.auto_discover_all()
+def auto_discover(portfolio_id: Optional[str] = None):
+    result = portfolio_service.auto_discover_all(portfolio_id)
     return result
 
 @app.post("/api/upload")

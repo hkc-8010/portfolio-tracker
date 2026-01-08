@@ -373,28 +373,35 @@ class PortfolioService:
         
         return ticker
 
-    def auto_discover_all(self):
-        """Auto-discovers tickers for all holdings without tickers."""
+    def auto_discover_all(self, portfolio_id: Optional[str] = None):
+        """Auto-discovers tickers for holdings without tickers."""
         try:
-            response = self.supabase.table('holdings').select('*').execute()
+            query = self.supabase.table('holdings').select('*')
+            if portfolio_id:
+                query = query.eq('portfolio_id', portfolio_id)
+            
+            response = query.execute()
             holdings = response.data
             updated_count = 0
             
             for holding in holdings:
                 isin = holding['isin']
+                pid = holding['portfolio_id']
                 current_ticker = holding.get('ticker')
                 
                 if not current_ticker:
                     found_ticker = self.auto_discover_ticker(isin, holding['stock_name'])
                     if found_ticker:
-                        print(f"Found {found_ticker} for {isin}")
-                        self.update_holding_settings(holding['portfolio_id'], isin, ticker=found_ticker)
+                        print(f"Found {found_ticker} for {isin} in {pid}")
+                        self.update_holding_settings(pid, isin, ticker=found_ticker)
                         updated_count += 1
                         time.sleep(0.2)  # Rate limit
             
             return {"updated": updated_count}
         except Exception as e:
             print(f"Error in auto_discover_all: {e}")
+            import traceback
+            traceback.print_exc()
             return {"updated": 0}
 
     def save_excel_file(self, content: bytes):

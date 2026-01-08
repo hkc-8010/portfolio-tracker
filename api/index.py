@@ -121,10 +121,10 @@ def update_settings(request: UpdateSettingsRequest):
     )
 
 @app.post("/api/discover")
-def auto_discover():
+def auto_discover(portfolio_id: Optional[str] = None):
     if portfolio_service is None:
         raise HTTPException(status_code=500, detail="Portfolio service not initialized")
-    result = portfolio_service.auto_discover_all()
+    result = portfolio_service.auto_discover_all(portfolio_id)
     return result
 
 @app.post("/api/upload")
