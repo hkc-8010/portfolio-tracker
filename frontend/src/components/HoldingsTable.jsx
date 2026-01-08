@@ -389,10 +389,20 @@ const HoldingsTable = ({ portfolioId }) => {
                                         {holding.current_price ? `₹${holding.current_price.toLocaleString('en-IN')}` : '-'}
                                     </td>
                                     <td className={clsx("p-4 text-right font-bold", holding.day_change_percent > 0 ? "text-green-600" : holding.day_change_percent < 0 ? "text-red-600" : "text-gray-400")}>
-                                        {holding.day_change_percent ? `${holding.day_change_percent > 0 ? '+' : ''}${holding.day_change_percent.toFixed(2)}%` : '-'}
+                                        {holding.day_change_percent ? (
+                                            <div className="flex flex-col items-end">
+                                                <span>{holding.day_change_percent.toFixed(2)}%</span>
+                                                <span className="text-[10px] font-medium opacity-80">({holding.day_change_amount * holding.quantity >= 0 ? '+' : '-'}₹{Math.abs(Math.round(holding.day_change_amount * holding.quantity)).toLocaleString('en-IN')})</span>
+                                            </div>
+                                        ) : '-'}
                                     </td>
                                     <td className={clsx("p-4 text-right font-black", holding.total_return_percent > 0 ? "text-green-600" : holding.total_return_percent < 0 ? "text-red-500" : "text-gray-400")}>
-                                        {holding.total_return_percent ? `${holding.total_return_percent >= 0 ? '+' : ''}${holding.total_return_percent.toFixed(1)}%` : '-'}
+                                        {holding.total_return_percent ? (
+                                            <div className="flex flex-col items-end">
+                                                <span>{holding.total_return_percent.toFixed(1)}%</span>
+                                                <span className="text-[10px] font-medium opacity-80">({(holding.current_price - holding.average_buy_price) * holding.quantity >= 0 ? '+' : '-'}₹{Math.abs(Math.round((holding.current_price - holding.average_buy_price) * holding.quantity)).toLocaleString('en-IN')})</span>
+                                            </div>
+                                        ) : '-'}
                                     </td>
                                     <td className="p-4 text-right whitespace-nowrap">
                                         {holding.current_price ? (
