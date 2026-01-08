@@ -22,7 +22,7 @@ class UpdateSettingsRequest(BaseModel):
     target: Optional[float] = None
     stop_loss: Optional[float] = None
     quantity: Optional[int] = None
-    avg_price: Optional[float] = None
+    average_buy_price: Optional[float] = None
 
 class AddHoldingRequest(BaseModel):
     portfolio_id: str
@@ -80,7 +80,7 @@ def update_settings(request: UpdateSettingsRequest):
         request.target,
         request.stop_loss,
         request.quantity,
-        request.avg_price
+        request.average_buy_price
     )
 
 @app.post("/api/discover")

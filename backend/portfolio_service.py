@@ -106,24 +106,16 @@ class PortfolioService:
                         }
                         
                         # Prepare for Supabase persistence
-                        # Include required fields to avoid NOT NULL violations on INSERT
+                        # ONLY include market data to avoid overwriting manual edits (Qty, Avg Price, etc.)
+                        # We use portfolio_id and isin as the unique key for the upsert
                         db_payload = {
                             "portfolio_id": portfolio_id,
                             "isin": holding['isin'],
-                            "stock_name": holding.get('stock_name'),
-                            "quantity": holding.get('quantity'),
-                            "average_buy_price": holding.get('average_buy_price'),
-                            "ticker": holding.get('ticker'),
-                            "target": holding.get('target'),
-                            "stop_loss": holding.get('stop_loss'),
-                            "date_of_exit": holding.get('date_of_exit'),
                             "last_price": price,
                             "last_day_change_amt": change_amt,
                             "last_day_change_pct": change_pct,
                             "market_data_updated_at": datetime.now(ZoneInfo("UTC")).isoformat()
                         }
-                        if 'id' in holding:
-                            db_payload['id'] = holding['id']
                         updates_to_supabase.append(db_payload)
 
                     # 2. Use data (Cache > Supabase Persistent > yf Fresh)
@@ -159,7 +151,7 @@ class PortfolioService:
                 # Background update Supabase if we have new data
                 if updates_to_supabase:
                     try:
-                        self.supabase.table('holdings').upsert(updates_to_supabase).execute()
+                        self.supabase.table('holdings').upsert(updates_to_supabase, on_conflict='portfolio_id,isin').execute()
                     except Exception as e:
                         print(f"Supabase persistence error: {e}")
 
@@ -311,7 +303,7 @@ class PortfolioService:
             print(f"Error deleting portfolio: {e}")
             return {"success": False, "error": str(e)}
 
-    def update_holding_settings(self, portfolio_id: str, isin: str, ticker: Optional[str] = None, date_of_exit: Optional[str] = None, target: Optional[float] = None, stop_loss: Optional[float] = None, quantity: Optional[int] = None, avg_price: Optional[float] = None):
+    def update_holding_settings(self, portfolio_id: str, isin: str, ticker: Optional[str] = None, date_of_exit: Optional[str] = None, target: Optional[float] = None, stop_loss: Optional[float] = None, quantity: Optional[int] = None, average_buy_price: Optional[float] = None):
         """Updates a holding's settings in Supabase."""
         try:
             update_data = {}
@@ -326,15 +318,21 @@ class PortfolioService:
                 update_data['stop_loss'] = stop_loss
             if quantity is not None:
                 update_data['quantity'] = quantity
-            if avg_price is not None:
-                update_data['average_buy_price'] = avg_price
+            if average_buy_price is not None:
+                update_data['average_buy_price'] = average_buy_price
             
             if update_data:
-                self.supabase.table('holdings').update(update_data).eq('portfolio_id', portfolio_id).eq('isin', isin).execute()
+                print(f"Updating holding: {isin} in portfolio: {portfolio_id} with {update_data}")
+                res = self.supabase.table('holdings').update(update_data).eq('portfolio_id', portfolio_id).eq('isin', isin).execute()
+                print(f"Update result: {res}")
+            else:
+                print("No update data provided")
             
             return {"success": True}
         except Exception as e:
             print(f"Error updating holding: {e}")
+            import traceback
+            traceback.print_exc()
             return {"success": False, "error": str(e)}
 
     def auto_discover_ticker(self, isin: str, stock_name: str) -> Optional[str]:
